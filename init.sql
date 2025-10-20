@@ -1,111 +1,130 @@
-SET FOREIGN_KEY_CHECKS=0;
 
+-- para criar e setar o DB 
+CREATE DATABASE IF NOT EXISTS `cimow_db`
+USE `cimow_db`;
 
--- =========== 1. CRIAÇÃO DAS TABELAS (ESTRUTURA) ===========
+--
+-- Estrutura da tabela `Usuarios`
+--
 
--- Tabela Central de Usuários
-CREATE TABLE IF NOT EXISTS `Usuarios` (
-    `id` INT AUTO_INCREMENT PRIMARY KEY,
-    `nome` VARCHAR(255) NOT NULL,
-    `cpf` VARCHAR(14) NOT NULL UNIQUE,
-    `email` VARCHAR(255) NOT NULL UNIQUE,
-    `senha` VARCHAR(255) NOT NULL, -- Lembre-se de armazenar a senha com hash!
-    `data_nascimento` DATE NOT NULL,
-    `telefone` VARCHAR(20),
-    `tipo_usuario` ENUM('paciente', 'medico', 'admin') NOT NULL,
-    `status` ENUM('ativo', 'inativo') NOT NULL DEFAULT 'ativo',
-    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-) ENGINE=InnoDB;
+CREATE TABLE `Usuarios` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT 'Identificador único do usuário (PK)',
+  `nome` varchar(255) NOT NULL COMMENT 'Nome completo do usuário',
+  `cpf` varchar(14) NOT NULL COMMENT 'CPF do usuário, deve ser único',
+  `email` varchar(255) NOT NULL COMMENT 'Endereço de e-mail do usuário, deve ser único',
+  `senha` varchar(255) NOT NULL COMMENT 'Senha do usuário, armazenada em formato hash',
+  `data_nascimento` date NOT NULL COMMENT 'Data de nascimento do usuário',
+  `telefone` varchar(20) DEFAULT NULL COMMENT 'Número de telefone de contato do usuário',
+  `tipo_usuario` enum('paciente','medico','admin') NOT NULL COMMENT 'Define o perfil de acesso do usuário (paciente, medico, admin)',
+  `status` enum('ativo','inativo') NOT NULL DEFAULT 'ativo' COMMENT 'Status da conta do usuário (ativa ou inativa)',
+  `created_at` timestamp NULL DEFAULT current_timestamp() COMMENT 'Data e hora de criação do registro',
+  `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp() COMMENT 'Data e hora da última atualização do registro',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `cpf` (`cpf`),
+  UNIQUE KEY `email` (`email`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Tabela central para armazenar informações de todos os usuários do sistema.';
 
--- Tabela de Médicos
-CREATE TABLE IF NOT EXISTS `Medicos` (
-    `id` INT AUTO_INCREMENT PRIMARY KEY,
-    `usuario_id` INT NOT NULL UNIQUE,
-    `crm` VARCHAR(20) NOT NULL UNIQUE,
-    `especialidade` VARCHAR(100) NOT NULL,
-    FOREIGN KEY (`usuario_id`) REFERENCES `Usuarios`(`id`) ON DELETE CASCADE
-) ENGINE=InnoDB;
+--
+-- Estrutura da tabela `LogsAtividades`
+--
 
--- Tabela de Pacientes
-CREATE TABLE IF NOT EXISTS `Pacientes` (
-    `id` INT AUTO_INCREMENT PRIMARY KEY,
-    `usuario_id` INT NOT NULL UNIQUE,
-    `historico_medico` TEXT,
-    FOREIGN KEY (`usuario_id`) REFERENCES `Usuarios`(`id`) ON DELETE CASCADE
-) ENGINE=InnoDB;
+CREATE TABLE `LogsAtividades` (
+  `id` bigint(20) NOT NULL AUTO_INCREMENT COMMENT 'Identificador único do log (PK)',
+  `usuario_id` int(11) DEFAULT NULL COMMENT 'ID do usuário que realizou a ação (FK de Usuarios)',
+  `acao` varchar(255) NOT NULL COMMENT 'Ação realizada pelo usuário (ex: login, logout, agendamento)',
+  `descricao` text DEFAULT NULL COMMENT 'Descrição detalhada da atividade registrada',
+  `data_hora` timestamp NULL DEFAULT current_timestamp() COMMENT 'Data e hora em que a ação ocorreu',
+  PRIMARY KEY (`id`),
+  KEY `idx_logsatividades_usuario_id` (`usuario_id`),
+  CONSTRAINT `LogsAtividades_ibfk_1` FOREIGN KEY (`usuario_id`) REFERENCES `Usuarios` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Registra as atividades importantes realizadas pelos usuários no sistema.';
 
--- Tabela de Consultas
-CREATE TABLE IF NOT EXISTS `Consultas` (
-    `id` INT AUTO_INCREMENT PRIMARY KEY,
-    `paciente_id` INT NOT NULL,
-    `medico_id` INT NOT NULL,
-    `data_hora` DATETIME NOT NULL,
-    `status` ENUM('agendada', 'realizada', 'cancelada') NOT NULL DEFAULT 'agendada',
-    `tipo_consulta` ENUM('online', 'presencial') NOT NULL,
-    `link_atendimento` VARCHAR(255),
-    `observacoes` TEXT,
-    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (`paciente_id`) REFERENCES `Pacientes`(`id`),
-    FOREIGN KEY (`medico_id`) REFERENCES `Medicos`(`id`)
-) ENGINE=InnoDB;
+--
+-- Estrutura da tabela `Medicos`
+--
 
--- Tabela de Prontuários
-CREATE TABLE IF NOT EXISTS `Prontuarios` (
-    `id` INT AUTO_INCREMENT PRIMARY KEY,
-    `consulta_id` INT NOT NULL UNIQUE,
-    `paciente_id` INT NOT NULL,
-    `medico_id` INT NOT NULL,
-    `anotacoes_medicas` TEXT NOT NULL,
-    `diagnostico` TEXT,
-    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    FOREIGN KEY (`consulta_id`) REFERENCES `Consultas`(`id`),
-    FOREIGN KEY (`paciente_id`) REFERENCES `Pacientes`(`id`),
-    FOREIGN KEY (`medico_id`) REFERENCES `Medicos`(`id`)
-) ENGINE=InnoDB;
+CREATE TABLE `Medicos` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT 'Identificador único do médico (PK)',
+  `usuario_id` int(11) NOT NULL COMMENT 'ID do usuário correspondente na tabela Usuarios (FK)',
+  `crm` varchar(20) NOT NULL COMMENT 'Registro do Conselho Regional de Medicina, deve ser único',
+  `especialidade` varchar(100) NOT NULL COMMENT 'Especialidade principal do médico',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `usuario_id` (`usuario_id`),
+  UNIQUE KEY `crm` (`crm`),
+  CONSTRAINT `Medicos_ibfk_1` FOREIGN KEY (`usuario_id`) REFERENCES `Usuarios` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Armazena informações específicas dos profissionais médicos.';
 
--- Tabela de Prescrições
-CREATE TABLE IF NOT EXISTS `Prescricoes` (
-    `id` INT AUTO_INCREMENT PRIMARY KEY,
-    `prontuario_id` INT NOT NULL,
-    `medicamento` VARCHAR(255) NOT NULL,
-    `dosagem` VARCHAR(100) NOT NULL,
-    `frequencia` VARCHAR(100) NOT NULL,
-    `duracao_tratamento` VARCHAR(100),
-    `instrucoes_adicionais` TEXT,
-    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (`prontuario_id`) REFERENCES `Prontuarios`(`id`)
-) ENGINE=InnoDB;
+--
+-- Estrutura da tabela `Pacientes`
+--
 
--- Tabela de Logs de Atividades
-CREATE TABLE IF NOT EXISTS `LogsAtividades` (
-    `id` BIGINT AUTO_INCREMENT PRIMARY KEY,
-    `usuario_id` INT,
-    `acao` VARCHAR(255) NOT NULL,
-    `descricao` TEXT,
-    `data_hora` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (`usuario_id`) REFERENCES `Usuarios`(`id`) ON DELETE SET NULL
-) ENGINE=InnoDB;
+CREATE TABLE `Pacientes` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT 'Identificador único do paciente (PK)',
+  `usuario_id` int(11) NOT NULL COMMENT 'ID do usuário correspondente na tabela Usuarios (FK)',
+  `historico_medico` text DEFAULT NULL COMMENT 'Resumo do histórico médico do paciente',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `usuario_id` (`usuario_id`),
+  CONSTRAINT `Pacientes_ibfk_1` FOREIGN KEY (`usuario_id`) REFERENCES `Usuarios` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Armazena informações específicas dos pacientes.';
 
+--
+-- Estrutura da tabela `Consultas`
+--
 
--- =========== 2. CRIAÇÃO DE ÍNDICES (PERFORMANCE) ===========
+CREATE TABLE `Consultas` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT 'Identificador único da consulta (PK)',
+  `paciente_id` int(11) NOT NULL COMMENT 'ID do paciente associado à consulta (FK de Pacientes)',
+  `medico_id` int(11) NOT NULL COMMENT 'ID do médico responsável pela consulta (FK de Medicos)',
+  `data_hora` datetime NOT NULL COMMENT 'Data e hora agendada para a consulta',
+  `status` enum('agendada','realizada','cancelada') NOT NULL DEFAULT 'agendada' COMMENT 'Status atual da consulta',
+  `tipo_consulta` enum('online','presencial') NOT NULL COMMENT 'Modalidade da consulta (online ou presencial)',
+  `link_atendimento` varchar(255) DEFAULT NULL COMMENT 'Link para a teleconsulta, se aplicável',
+  `observacoes` text DEFAULT NULL COMMENT 'Observações adicionais sobre o agendamento da consulta',
+  `created_at` timestamp NULL DEFAULT current_timestamp() COMMENT 'Data e hora de criação do registro da consulta',
+  PRIMARY KEY (`id`),
+  KEY `idx_consultas_paciente_id` (`paciente_id`),
+  KEY `idx_consultas_medico_id` (`medico_id`),
+  KEY `idx_consultas_data_hora` (`data_hora`),
+  CONSTRAINT `Consultas_ibfk_1` FOREIGN KEY (`paciente_id`) REFERENCES `Pacientes` (`id`),
+  CONSTRAINT `Consultas_ibfk_2` FOREIGN KEY (`medico_id`) REFERENCES `Medicos` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Armazena informações sobre os agendamentos de consultas.';
 
--- Índices na tabela de Consultas
-CREATE INDEX idx_consultas_paciente_id ON Consultas(paciente_id);
-CREATE INDEX idx_consultas_medico_id ON Consultas(medico_id);
-CREATE INDEX idx_consultas_data_hora ON Consultas(data_hora);
+--
+-- Estrutura da tabela `Prontuarios`
+--
 
--- Índices na tabela de Prontuários
-CREATE INDEX idx_prontuarios_paciente_id ON Prontuarios(paciente_id);
-CREATE INDEX idx_prontuarios_medico_id ON Prontuarios(medico_id);
+CREATE TABLE `Prontuarios` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT 'Identificador único do prontuário (PK)',
+  `consulta_id` int(11) NOT NULL COMMENT 'ID da consulta que originou este prontuário (FK de Consultas)',
+  `paciente_id` int(11) NOT NULL COMMENT 'ID do paciente a quem o prontuário pertence (FK de Pacientes)',
+  `medico_id` int(11) NOT NULL COMMENT 'ID do médico que criou o prontuário (FK de Medicos)',
+  `anotacoes_medicas` text NOT NULL COMMENT 'Anotações detalhadas feitas pelo médico durante a consulta',
+  `diagnostico` text DEFAULT NULL COMMENT 'Diagnóstico do médico para o paciente',
+  `created_at` timestamp NULL DEFAULT current_timestamp() COMMENT 'Data e hora de criação do prontuário',
+  `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp() COMMENT 'Data e hora da última atualização do prontuário',
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `consulta_id` (`consulta_id`),
+  KEY `idx_prontuarios_paciente_id` (`paciente_id`),
+  KEY `idx_prontuarios_medico_id` (`medico_id`),
+  CONSTRAINT `Prontuarios_ibfk_1` FOREIGN KEY (`consulta_id`) REFERENCES `Consultas` (`id`),
+  CONSTRAINT `Prontuarios_ibfk_2` FOREIGN KEY (`paciente_id`) REFERENCES `Pacientes` (`id`),
+  CONSTRAINT `Prontuarios_ibfk_3` FOREIGN KEY (`medico_id`) REFERENCES `Medicos` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Registros médicos eletrônicos gerados a partir de cada consulta.';
 
--- Índice na tabela de Prescrições
-CREATE INDEX idx_prescricoes_prontuario_id ON Prescricoes(prontuario_id);
+--
+-- Estrutura da tabela `Prescricoes`
+--
 
--- Índice na tabela de Logs de Atividades
-CREATE INDEX idx_logsatividades_usuario_id ON LogsAtividades(usuario_id);
-
-
--- Reabilita a verificação de chaves estrangeiras
-SET FOREIGN_KEY_CHECKS=1;
+CREATE TABLE `Prescricoes` (
+  `id` int(11) NOT NULL AUTO_INCREMENT COMMENT 'Identificador único da prescrição (PK)',
+  `prontuario_id` int(11) NOT NULL COMMENT 'ID do prontuário ao qual esta prescrição está vinculada (FK de Prontuarios)',
+  `medicamento` varchar(255) NOT NULL COMMENT 'Nome do medicamento prescrito',
+  `dosagem` varchar(100) NOT NULL COMMENT 'Dosagem recomendada do medicamento (ex: 500mg)',
+  `frequencia` varchar(100) NOT NULL COMMENT 'Frequência de uso (ex: de 8 em 8 horas)',
+  `duracao_tratamento` varchar(100) DEFAULT NULL COMMENT 'Duração do tratamento (ex: 7 dias)',
+  `instrucoes_adicionais` text DEFAULT NULL COMMENT 'Instruções extras para o paciente sobre o uso do medicamento',
+  `created_at` timestamp NULL DEFAULT current_timestamp() COMMENT 'Data e hora da emissão da prescrição',
+  PRIMARY KEY (`id`),
+  KEY `idx_prescricoes_prontuario_id` (`prontuario_id`),
+  CONSTRAINT `Prescricoes_ibfk_1` FOREIGN KEY (`prontuario_id`) REFERENCES `Prontuarios` (`id`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='Armazena as prescrições médicas associadas a um prontuário.';
